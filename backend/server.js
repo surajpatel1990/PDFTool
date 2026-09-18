@@ -35,13 +35,20 @@ app.post("/convert", upload.single("file"), async (req, res) => {
   const profileDir = path.join(workDir, "profile");
   fs.mkdirSync(profileDir);
 
+  const FILTER_MAP = {
+    docx: "docx:MS Word 2007 XML",
+    pptx: "pptx:Impress MS PowerPoint 2007 XML",
+    xlsx: "xlsx:Calc MS Excel 2007 XML"
+  };
+  const convertArg = FILTER_MAP[target] || target;
+
   execFile(
     "soffice",
     [
       "--headless",
       "--norestore",
       `-env:UserInstallation=file://${profileDir}`,
-      "--convert-to", target,
+      "--convert-to", convertArg,
       "--outdir", workDir,
       inputPath
     ],

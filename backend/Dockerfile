@@ -1,7 +1,14 @@
 FROM node:20-slim
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libreoffice && \
+    apt-get install -y --no-install-recommends \
+      libreoffice-writer \
+      libreoffice-calc \
+      libreoffice-impress \
+      libreoffice-core \
+      default-jre-headless \
+      fonts-dejavu \
+      fonts-liberation && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
