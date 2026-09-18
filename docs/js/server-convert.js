@@ -1,5 +1,5 @@
 // Change this to your deployed Render backend URL
-const API_BASE = "https://your-backend.onrender.com";
+const API_BASE = "https://pdftool-4x5t.onrender.com";
 
 async function convertOnServer(file, targetFormat, statusEl, downloadName) {
   statusEl.textContent = "Uploading & converting... (first request may take 30s - server waking up)";
