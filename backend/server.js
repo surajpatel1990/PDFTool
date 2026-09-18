@@ -19,6 +19,13 @@ app.use((req, res, next) => {
 
 app.get("/", (req, res) => res.send("PDF converter API is running."));
 
+app.get("/diag", (req, res) => {
+  const { execFile: ef } = require("child_process");
+  ef("sh", ["-c", "whoami && echo --- && df -h /tmp && echo --- && ls -la /tmp && echo --- && soffice --version"], (err, stdout, stderr) => {
+    res.type("text/plain").send(`STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}\n\nERR:\n${err ? err.message : "none"}`);
+  });
+});
+
 const ALLOWED_TARGETS = new Set(["docx", "pptx", "xlsx", "pdf"]);
 
 app.post("/convert", upload.single("file"), async (req, res) => {
