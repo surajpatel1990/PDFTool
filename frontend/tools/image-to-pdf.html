@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Image to PDF</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<header><h1>Image to PDF</h1></header>
+<div class="tool-page">
+  <div class="dropzone" id="drop">Drop JPG/PNG images here (order = page order)</div>
+  <input type="file" id="fileInput" accept="image/*" multiple hidden>
+  <div id="fileList"></div>
+  <button id="convertBtn" disabled>Convert & Download</button>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const convertBtn = document.getElementById('convertBtn');
+let files = [];
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+drop.ondragleave = () => drop.classList.remove('dragover');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('dragover'); addFiles(e.dataTransfer.files); };
+fileInput.onchange = () => addFiles(fileInput.files);
+
+function addFiles(fl) {
+  files.push(...Array.from(fl));
+  fileList.innerHTML = files.map((f,i) => `<div>${i+1}. ${f.name}</div>`).join('');
+  convertBtn.disabled = files.length === 0;
+}
+
+convertBtn.onclick = async () => {
+  convertBtn.disabled = true;
+  convertBtn.textContent = 'Converting...';
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  for (let i = 0; i < files.length; i++) {
+    const dataUrl = await fileToDataUrl(files[i]);
+    const img = await loadImage(dataUrl);
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const ratio = Math.min(pageW / img.width, pageH / img.height);
+    const w = img.width * ratio, h = img.height * ratio;
+    if (i > 0) doc.addPage();
+    doc.addImage(dataUrl, 'JPEG', (pageW-w)/2, (pageH-h)/2, w, h);
+  }
+  doc.save('images.pdf');
+  convertBtn.textContent = 'Convert & Download';
+  convertBtn.disabled = false;
+};
+
+function fileToDataUrl(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+function loadImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+</script>
+</body>
+</html>

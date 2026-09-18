@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Merge PDF</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+<header><h1>Merge PDF</h1></header>
+<div class="tool-page">
+  <div class="dropzone" id="drop">Drop PDFs here or click to select (order = merge order)</div>
+  <input type="file" id="fileInput" accept="application/pdf" multiple hidden>
+  <div id="fileList"></div>
+  <button id="mergeBtn" disabled>Merge & Download</button>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const mergeBtn = document.getElementById('mergeBtn');
+let files = [];
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+drop.ondragleave = () => drop.classList.remove('dragover');
+drop.ondrop = e => {
+  e.preventDefault();
+  drop.classList.remove('dragover');
+  addFiles(e.dataTransfer.files);
+};
+fileInput.onchange = () => addFiles(fileInput.files);
+
+function addFiles(fl) {
+  files.push(...Array.from(fl));
+  renderList();
+}
+function renderList() {
+  fileList.innerHTML = files.map((f,i) => `<div>${i+1}. ${f.name}</div>`).join('');
+  mergeBtn.disabled = files.length < 2;
+}
+
+mergeBtn.onclick = async () => {
+  mergeBtn.disabled = true;
+  mergeBtn.textContent = 'Merging...';
+  const { PDFDocument } = PDFLib;
+  const mergedPdf = await PDFDocument.create();
+  for (const file of files) {
+    const bytes = await file.arrayBuffer();
+    const pdf = await PDFDocument.load(bytes);
+    const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    pages.forEach(p => mergedPdf.addPage(p));
+  }
+  const mergedBytes = await mergedPdf.save();
+  downloadBlob(new Blob([mergedBytes], { type: 'application/pdf' }), 'merged.pdf');
+  mergeBtn.textContent = 'Merge & Download';
+  mergeBtn.disabled = false;
+};
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

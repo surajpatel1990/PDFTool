@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Split PDF</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+<header><h1>Split PDF</h1></header>
+<div class="tool-page">
+  <div class="dropzone" id="drop">Drop a PDF here or click to select</div>
+  <input type="file" id="fileInput" accept="application/pdf" hidden>
+  <div id="info"></div>
+  <p>Page range to extract (e.g. 1-3,5):</p>
+  <input type="text" id="range" placeholder="1-3,5" style="padding:.5rem;width:100%;max-width:300px;">
+  <br><br>
+  <button id="splitBtn" disabled>Split & Download</button>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const info = document.getElementById('info');
+const rangeInput = document.getElementById('range');
+const splitBtn = document.getElementById('splitBtn');
+let currentFile = null;
+let totalPages = 0;
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+drop.ondragleave = () => drop.classList.remove('dragover');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); };
+fileInput.onchange = () => handleFile(fileInput.files[0]);
+
+async function handleFile(file) {
+  if (!file) return;
+  currentFile = file;
+  const { PDFDocument } = PDFLib;
+  const bytes = await file.arrayBuffer();
+  const pdf = await PDFDocument.load(bytes);
+  totalPages = pdf.getPageCount();
+  info.textContent = `${file.name} — ${totalPages} pages`;
+  splitBtn.disabled = false;
+}
+
+function parseRange(str, max) {
+  const indices = new Set();
+  str.split(',').forEach(part => {
+    part = part.trim();
+    if (!part) return;
+    if (part.includes('-')) {
+      const [a,b] = part.split('-').map(n => parseInt(n.trim()));
+      for (let i=a; i<=b; i++) if (i>=1 && i<=max) indices.add(i-1);
+    } else {
+      const n = parseInt(part);
+      if (n>=1 && n<=max) indices.add(n-1);
+    }
+  });
+  return Array.from(indices).sort((a,b)=>a-b);
+}
+
+splitBtn.onclick = async () => {
+  const range = rangeInput.value.trim();
+  const indices = range ? parseRange(range, totalPages) : Array.from({length: totalPages}, (_,i)=>i);
+  if (indices.length === 0) { alert('No valid pages in range'); return; }
+  splitBtn.disabled = true;
+  splitBtn.textContent = 'Splitting...';
+  const { PDFDocument } = PDFLib;
+  const bytes = await currentFile.arrayBuffer();
+  const src = await PDFDocument.load(bytes);
+  const out = await PDFDocument.create();
+  const pages = await out.copyPages(src, indices);
+  pages.forEach(p => out.addPage(p));
+  const outBytes = await out.save();
+  const blob = new Blob([outBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'split.pdf';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  splitBtn.textContent = 'Split & Download';
+  splitBtn.disabled = false;
+};
+</script>
+</body>
+</html>

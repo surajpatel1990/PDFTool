@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rotate PDF</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+<header><h1>Rotate PDF</h1></header>
+<div class="tool-page">
+  <div class="dropzone" id="drop">Drop a PDF here or click to select</div>
+  <input type="file" id="fileInput" accept="application/pdf" hidden>
+  <div id="info"></div>
+  <p>Rotate all pages by:</p>
+  <select id="angle" style="padding:.5rem;">
+    <option value="90">90°</option>
+    <option value="180">180°</option>
+    <option value="270">270°</option>
+  </select>
+  <br><br>
+  <button id="rotateBtn" disabled>Rotate & Download</button>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const info = document.getElementById('info');
+const rotateBtn = document.getElementById('rotateBtn');
+let currentFile = null;
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+drop.ondragleave = () => drop.classList.remove('dragover');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); };
+fileInput.onchange = () => handleFile(fileInput.files[0]);
+
+function handleFile(file) {
+  if (!file) return;
+  currentFile = file;
+  info.textContent = file.name;
+  rotateBtn.disabled = false;
+}
+
+rotateBtn.onclick = async () => {
+  const angle = parseInt(document.getElementById('angle').value);
+  rotateBtn.disabled = true;
+  rotateBtn.textContent = 'Rotating...';
+  const { PDFDocument, degrees } = PDFLib;
+  const bytes = await currentFile.arrayBuffer();
+  const pdf = await PDFDocument.load(bytes);
+  pdf.getPages().forEach(page => {
+    const current = page.getRotation().angle;
+    page.setRotation(degrees(current + angle));
+  });
+  const outBytes = await pdf.save();
+  const blob = new Blob([outBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'rotated.pdf';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  rotateBtn.textContent = 'Rotate & Download';
+  rotateBtn.disabled = false;
+};
+</script>
+</body>
+</html>

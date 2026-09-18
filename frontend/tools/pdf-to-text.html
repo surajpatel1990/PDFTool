@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PDF to Text</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<header><h1>PDF to Text</h1></header>
+<div class="tool-page">
+  <div class="dropzone" id="drop">Drop a PDF here or click to select</div>
+  <input type="file" id="fileInput" accept="application/pdf" hidden>
+  <div id="status"></div>
+  <textarea id="output" style="width:100%;height:300px;margin-top:1rem;" readonly></textarea>
+  <br><br>
+  <button id="downloadBtn" disabled>Download .txt</button>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const status = document.getElementById('status');
+const output = document.getElementById('output');
+const downloadBtn = document.getElementById('downloadBtn');
+let extractedText = '';
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+drop.ondragleave = () => drop.classList.remove('dragover');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); };
+fileInput.onchange = () => handleFile(fileInput.files[0]);
+
+async function handleFile(file) {
+  if (!file) return;
+  status.textContent = 'Extracting...';
+  output.value = '';
+  const bytes = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(it => it.str).join(' ') + '\n\n';
+  }
+  extractedText = text;
+  output.value = text;
+  status.textContent = `Done — ${pdf.numPages} pages`;
+  downloadBtn.disabled = false;
+}
+
+downloadBtn.onclick = () => {
+  const blob = new Blob([extractedText], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'extracted.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+};
+</script>
+</body>
+</html>
