@@ -11,7 +11,7 @@ RUN apt-get update && \
       fonts-liberation && \
     rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -u 1000 appuser
+RUN useradd -m -u 1001 appuser
 RUN mkdir -p /app && chown -R appuser:appuser /app /tmp
 
 WORKDIR /app
