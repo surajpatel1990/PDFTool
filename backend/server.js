@@ -26,6 +26,43 @@ app.get("/diag", (req, res) => {
   });
 });
 
+app.get("/diag2", (req, res) => {
+  // minimal valid 1-page PDF with just text "Hello"
+  const minimalPdf = `%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj
+4 0 obj<</Length 44>>stream
+BT /F1 24 Tf 20 100 Td (Hello Test) Tj ET
+endstream
+endobj
+5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj
+xref
+0 6
+trailer<</Size 6/Root 1 0 R>>
+startxref
+0
+%%EOF`;
+  const workDir = path.join(os.tmpdir(), randomUUID());
+  fs.mkdirSync(workDir, { recursive: true, mode: 0o777 });
+  const inputPath = path.join(workDir, "test.pdf");
+  fs.writeFileSync(inputPath, minimalPdf);
+  const profileDir = path.join(workDir, "profile");
+  fs.mkdirSync(profileDir, { recursive: true, mode: 0o777 });
+
+  execFile(
+    "soffice",
+    ["--headless", "--invisible", "--norestore", `-env:UserInstallation=file://${profileDir}`, "--convert-to", "docx:MS Word 2007 XML", "--outdir", workDir, inputPath],
+    { timeout: 60000, env: { ...process.env, HOME: profileDir } },
+    (err, stdout, stderr) => {
+      const outputPath = path.join(workDir, "test.docx");
+      const exists = fs.existsSync(outputPath);
+      res.type("text/plain").send(`STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}\n\nERR:\n${err ? err.message : "none"}\n\nOutput exists: ${exists}\n\nFiles: ${fs.readdirSync(workDir)}`);
+      cleanup(workDir);
+    }
+  );
+});
+
 const ALLOWED_TARGETS = new Set(["docx", "pptx", "xlsx", "pdf"]);
 
 app.post("/convert", upload.single("file"), async (req, res) => {
