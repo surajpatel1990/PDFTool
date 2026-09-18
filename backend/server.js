@@ -32,18 +32,33 @@ app.post("/convert", upload.single("file"), async (req, res) => {
   const inputPath = path.join(workDir, req.file.originalname || "input");
   fs.renameSync(req.file.path, inputPath);
 
+  const profileDir = path.join(workDir, "profile");
+  fs.mkdirSync(profileDir);
+
   execFile(
     "soffice",
-    ["--headless", "--convert-to", target, "--outdir", workDir, inputPath],
-    { timeout: 60000 },
-    (err) => {
+    [
+      "--headless",
+      "--norestore",
+      `-env:UserInstallation=file://${profileDir}`,
+      "--convert-to", target,
+      "--outdir", workDir,
+      inputPath
+    ],
+    { timeout: 90000 },
+    (err, stdout, stderr) => {
+      console.log("soffice stdout:", stdout);
+      console.log("soffice stderr:", stderr);
       if (err) {
+        console.log("soffice exec error:", err.message);
         cleanup(workDir);
         return res.status(500).send("Conversion failed");
       }
       const base = path.basename(inputPath, path.extname(inputPath));
       const outputPath = path.join(workDir, `${base}.${target}`);
       if (!fs.existsSync(outputPath)) {
+        console.log("Expected output not found at:", outputPath);
+        console.log("Files in workDir:", fs.readdirSync(workDir));
         cleanup(workDir);
         return res.status(500).send("Conversion failed - output missing");
       }
