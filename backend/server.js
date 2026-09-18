@@ -33,7 +33,9 @@ app.post("/convert", upload.single("file"), async (req, res) => {
   fs.renameSync(req.file.path, inputPath);
 
   const profileDir = path.join(workDir, "profile");
-  fs.mkdirSync(profileDir);
+  fs.mkdirSync(profileDir, { recursive: true, mode: 0o777 });
+  fs.mkdirSync(path.join(profileDir, "cache"), { recursive: true, mode: 0o777 });
+  fs.mkdirSync(path.join(profileDir, "config"), { recursive: true, mode: 0o777 });
 
   const FILTER_MAP = {
     docx: "docx:MS Word 2007 XML",
@@ -46,13 +48,27 @@ app.post("/convert", upload.single("file"), async (req, res) => {
     "soffice",
     [
       "--headless",
+      "--invisible",
+      "--nocrashreport",
+      "--nodefault",
       "--norestore",
+      "--nolockcheck",
+      "--nologo",
+      "--nofirststartwizard",
       `-env:UserInstallation=file://${profileDir}`,
       "--convert-to", convertArg,
       "--outdir", workDir,
       inputPath
     ],
-    { timeout: 90000 },
+    {
+      timeout: 90000,
+      env: {
+        ...process.env,
+        HOME: profileDir,
+        XDG_CACHE_HOME: path.join(profileDir, "cache"),
+        XDG_CONFIG_HOME: path.join(profileDir, "config")
+      }
+    },
     (err, stdout, stderr) => {
       console.log("soffice stdout:", stdout);
       console.log("soffice stderr:", stderr);
