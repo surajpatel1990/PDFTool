@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://surajpatel1990.github.io/PDFTool/sitemap.xml
