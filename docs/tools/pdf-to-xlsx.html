@@ -15,7 +15,7 @@
 </script>
 </head>
 <body>
-<header><h1>PDF to PowerPoint (.pptx)</h1></header>
+<header><h1>PDF to Excel (.xlsx)</h1></header>
 <div class="tool-page">
   <div class="dropzone" id="drop">Drop a PDF here or click to select</div>
   <input type="file" id="fileInput" accept="application/pdf" hidden>
@@ -46,7 +46,7 @@ function handleFile(file) {
 convertBtn.onclick = async () => {
   convertBtn.disabled = true;
   try {
-    await convertOnServer(currentFile, 'pptx', status, 'converted.pptx');
+    await convertOnServer(currentFile, 'xlsx', status, 'converted.xlsx');
   } catch (e) {}
   convertBtn.disabled = false;
 };
