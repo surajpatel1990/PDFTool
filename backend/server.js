@@ -131,7 +131,7 @@ startxref
   run(0);
 });
 
-app.get("/diag2", (req, res) => {
+app.get("/diagdeep", (req, res) => {
   const minimalPdf = `%PDF-1.4
 1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
@@ -147,27 +147,63 @@ trailer<</Size 6/Root 1 0 R>>
 startxref
 0
 %%EOF`;
-  const workDir = path.join(os.tmpdir(), randomUUID());
-  fs.mkdirSync(workDir, { recursive: true, mode: 0o777 });
-  const inputPath = path.join(workDir, "test.pdf");
-  fs.writeFileSync(inputPath, minimalPdf);
-  const profileDir = path.join(workDir, "profile");
-  fs.mkdirSync(profileDir, { recursive: true, mode: 0o777 });
+  let out = [];
 
-  execFile(
-    "soffice",
-    ["--headless", "--invisible", "--norestore", `-env:UserInstallation=file://${profileDir}`, "--convert-to", "docx:MS Word 2007 XML", "--outdir", workDir, inputPath],
-    { timeout: 60000, env: { ...process.env, HOME: profileDir } },
-    (err, stdout, stderr) => {
-      const outputPath = path.join(workDir, "test.docx");
-      const exists = fs.existsSync(outputPath);
-      res.type("text/plain").send(`STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}\n\nERR:\n${err ? err.message : "none"}\n\nOutput exists: ${exists}\n\nFiles: ${fs.readdirSync(workDir)}`);
-      cleanup(workDir);
-    }
-  );
+  function convert(inputPath, workDir, fmt, filter, cb) {
+    const profileDir = path.join(os.tmpdir(), "profile-" + randomUUID());
+    fs.mkdirSync(profileDir, { recursive: true, mode: 0o777 });
+    execFile(
+      "soffice",
+      ["--headless", "--invisible", "--norestore", `-env:UserInstallation=file://${profileDir}`, "--convert-to", `${fmt}:${filter}`, "--outdir", workDir, inputPath],
+      { timeout: 60000, env: { ...process.env, HOME: profileDir } },
+      (err, stdout, stderr) => {
+        const base = path.basename(inputPath, path.extname(inputPath));
+        const outputPath = path.join(workDir, `${base}.${fmt}`);
+        const exists = fs.existsSync(outputPath);
+        out.push(`--- ${fmt} (${filter}) from ${path.basename(inputPath)} ---\nSTDOUT:${stdout}\nSTDERR:${stderr}\nERR:${err ? err.message : "none"}\nExists:${exists}`);
+        cleanup(profileDir);
+        cb(exists ? outputPath : null);
+      }
+    );
+  }
+
+  // Test A: direct pdf -> docx
+  const wdA = path.join(os.tmpdir(), randomUUID());
+  fs.mkdirSync(wdA, { recursive: true, mode: 0o777 });
+  const pdfA = path.join(wdA, "a.pdf");
+  fs.writeFileSync(pdfA, minimalPdf);
+
+  convert(pdfA, wdA, "docx", "MS Word 2007 XML", (docxDirect) => {
+    // Test B: pdf -> odt -> docx (two-step)
+    const wdB = path.join(os.tmpdir(), randomUUID());
+    fs.mkdirSync(wdB, { recursive: true, mode: 0o777 });
+    const pdfB = path.join(wdB, "b.pdf");
+    fs.writeFileSync(pdfB, minimalPdf);
+
+    convert(pdfB, wdB, "odt", "writer8", (odtOut) => {
+      if (!odtOut) {
+        cleanup(wdA); cleanup(wdB);
+        return res.type("text/plain").send(out.join("\n\n"));
+      }
+      convert(odtOut, wdB, "docx", "MS Word 2007 XML", (docxFromOdt) => {
+        // Test C: pptx and xlsx direct
+        const wdC = path.join(os.tmpdir(), randomUUID());
+        fs.mkdirSync(wdC, { recursive: true, mode: 0o777 });
+        const pdfC = path.join(wdC, "c.pdf");
+        fs.writeFileSync(pdfC, minimalPdf);
+        convert(pdfC, wdC, "pptx", "Impress MS PowerPoint 2007 XML", (pptxOut) => {
+          convert(pdfC, wdC, "xlsx", "Calc MS Excel 2007 XML", (xlsxOut) => {
+            cleanup(wdA); cleanup(wdB); cleanup(wdC);
+            res.type("text/plain").send(out.join("\n\n"));
+          });
+        });
+      });
+    });
+  });
 });
 
 const ALLOWED_TARGETS = new Set(["docx", "pptx", "xlsx", "pdf"]);
+
 
 app.post("/convert", upload.single("file"), async (req, res) => {
   const target = req.body.target;
