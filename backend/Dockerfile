@@ -6,10 +6,13 @@ RUN apt-get update && \
       libreoffice-calc \
       libreoffice-impress \
       libreoffice-core \
-      default-jre-headless \
+      libreoffice-java-common \
+      openjdk-17-jre-headless \
       fonts-dejavu \
       fonts-liberation && \
     rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
 RUN useradd -m -u 1001 appuser
 RUN mkdir -p /app && chown -R appuser:appuser /app /tmp
