@@ -14,9 +14,11 @@ body {
 header {
   background: var(--primary);
   color: #fff;
-  padding: 2rem 1rem;
+  padding: 1rem 1rem;
   text-align: center;
 }
+header h1 { margin: 0.3rem 0; font-size: 1.8rem; }
+header p { margin: 0; font-size: 0.95rem; }
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
