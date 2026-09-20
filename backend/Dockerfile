@@ -9,8 +9,13 @@ RUN apt-get update && \
       libreoffice-java-common \
       openjdk-17-jre-headless \
       fonts-dejavu \
-      fonts-liberation && \
+      fonts-liberation \
+      python3 \
+      python3-pip \
+      poppler-utils && \
     rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --break-system-packages --no-cache-dir pdf2docx
 
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 

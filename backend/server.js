@@ -202,29 +202,49 @@ startxref
   });
 });
 
-const ALLOWED_TARGETS = new Set(["docx", "pptx", "xlsx", "pdf"]);
-
+const ALLOWED_TARGETS = new Set(["docx", "pptx", "pdf"]);
 
 app.post("/convert", upload.single("file"), async (req, res) => {
   const target = req.body.target;
   if (!req.file || !ALLOWED_TARGETS.has(target)) {
-    return res.status(400).send("Invalid request");
+    return res.status(400).send("Invalid or unsupported target format");
   }
 
   const workDir = path.join(os.tmpdir(), randomUUID());
-  fs.mkdirSync(workDir);
+  fs.mkdirSync(workDir, { recursive: true, mode: 0o777 });
   const inputPath = path.join(workDir, req.file.originalname || "input");
   fs.renameSync(req.file.path, inputPath);
+  const base = path.basename(inputPath, path.extname(inputPath));
+  const outputPath = path.join(workDir, `${base}.${target}`);
 
+  if (target === "docx") {
+    // Use pdf2docx (Python) - LibreOffice's DOCX exporter has a bug with
+    // PDF-imported content (confirmed via testing: fails even via ODT
+    // intermediate, while ODT/PPTX exports work fine)
+    execFile(
+      "python3",
+      ["-c",
+        `from pdf2docx import Converter; cv = Converter("${inputPath}"); cv.convert("${outputPath}"); cv.close()`
+      ],
+      { timeout: 90000 },
+      (err, stdout, stderr) => {
+        if (err || !fs.existsSync(outputPath)) {
+          console.log("pdf2docx error:", err ? err.message : "output missing", stderr);
+          cleanup(workDir);
+          return res.status(500).send("Conversion failed");
+        }
+        res.download(outputPath, "converted.docx", () => cleanup(workDir));
+      }
+    );
+    return;
+  }
+
+  // pptx and pdf (office-to-pdf) use LibreOffice - these work reliably
   const profileDir = path.join(workDir, "profile");
   fs.mkdirSync(profileDir, { recursive: true, mode: 0o777 });
-  fs.mkdirSync(path.join(profileDir, "cache"), { recursive: true, mode: 0o777 });
-  fs.mkdirSync(path.join(profileDir, "config"), { recursive: true, mode: 0o777 });
 
   const FILTER_MAP = {
-    docx: "docx:MS Word 2007 XML",
-    pptx: "pptx:Impress MS PowerPoint 2007 XML",
-    xlsx: "xlsx:Calc MS Excel 2007 XML"
+    pptx: "pptx:Impress MS PowerPoint 2007 XML"
   };
   const convertArg = FILTER_MAP[target] || target;
 
@@ -244,30 +264,12 @@ app.post("/convert", upload.single("file"), async (req, res) => {
       "--outdir", workDir,
       inputPath
     ],
-    {
-      timeout: 90000,
-      env: {
-        ...process.env,
-        HOME: profileDir,
-        XDG_CACHE_HOME: path.join(profileDir, "cache"),
-        XDG_CONFIG_HOME: path.join(profileDir, "config")
-      }
-    },
+    { timeout: 90000, env: { ...process.env, HOME: profileDir } },
     (err, stdout, stderr) => {
-      console.log("soffice stdout:", stdout);
-      console.log("soffice stderr:", stderr);
-      if (err) {
-        console.log("soffice exec error:", err.message);
+      if (err || !fs.existsSync(outputPath)) {
+        console.log("soffice error:", err ? err.message : "output missing", stderr);
         cleanup(workDir);
         return res.status(500).send("Conversion failed");
-      }
-      const base = path.basename(inputPath, path.extname(inputPath));
-      const outputPath = path.join(workDir, `${base}.${target}`);
-      if (!fs.existsSync(outputPath)) {
-        console.log("Expected output not found at:", outputPath);
-        console.log("Files in workDir:", fs.readdirSync(workDir));
-        cleanup(workDir);
-        return res.status(500).send("Conversion failed - output missing");
       }
       res.download(outputPath, `converted.${target}`, () => cleanup(workDir));
     }
