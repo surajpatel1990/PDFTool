@@ -23,7 +23,7 @@ header p { margin: 0; font-size: 0.95rem; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
-  padding: 2rem;
+  padding: 2rem 2rem 0.5rem;
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -42,7 +42,7 @@ header p { margin: 0; font-size: 0.95rem; }
 .card.server h3::after { content: " ⚡"; }
 footer {
   text-align: center;
-  padding: 1rem;
+  padding: 0.5rem;
   font-size: .85rem;
   color: #777;
 }
