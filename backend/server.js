@@ -26,6 +26,59 @@ app.get("/diag", (req, res) => {
   });
 });
 
+app.get("/diagall", (req, res) => {
+  const minimalPdf = `%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj
+4 0 obj<</Length 44>>stream
+BT /F1 24 Tf 20 100 Td (Hello Test) Tj ET
+endstream
+endobj
+5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj
+xref
+0 6
+trailer<</Size 6/Root 1 0 R>>
+startxref
+0
+%%EOF`;
+
+  const { execFile: ef } = require("child_process");
+  let out = [];
+
+  ef("sh", ["-c", "whoami && id && echo --- && df -h /tmp && echo --- && ls -la /tmp && echo --- && soffice --version && echo --- && which soffice && echo --- && dpkg -l | grep -i libreoffice"], (err, stdout, stderr) => {
+    out.push(`=== SYSTEM INFO ===\n${stdout}\nSTDERR:${stderr}\nERR:${err ? err.message : "none"}`);
+
+    const formats = ["docx", "odt", "txt", "pdf"];
+    function testFormat(i) {
+      if (i >= formats.length) {
+        return res.type("text/plain").send(out.join("\n\n"));
+      }
+      const fmt = formats[i];
+      const workDir = path.join(os.tmpdir(), randomUUID());
+      fs.mkdirSync(workDir, { recursive: true, mode: 0o777 });
+      const inputPath = path.join(workDir, "test.pdf");
+      fs.writeFileSync(inputPath, minimalPdf);
+      const profileDir = path.join(workDir, "profile");
+      fs.mkdirSync(profileDir, { recursive: true, mode: 0o777 });
+
+      execFile(
+        "soffice",
+        ["--headless", "--invisible", "--norestore", `-env:UserInstallation=file://${profileDir}`, "--convert-to", fmt, "--outdir", workDir, inputPath],
+        { timeout: 60000, env: { ...process.env, HOME: profileDir } },
+        (err2, stdout2, stderr2) => {
+          const outputPath = path.join(workDir, `test.${fmt}`);
+          const exists = fs.existsSync(outputPath);
+          out.push(`=== FORMAT: ${fmt} ===\nSTDOUT:${stdout2}\nSTDERR:${stderr2}\nERR:${err2 ? err2.message : "none"}\nOutput exists: ${exists}`);
+          cleanup(workDir);
+          testFormat(i + 1);
+        }
+      );
+    }
+    testFormat(0);
+  });
+});
+
 app.get("/diag2", (req, res) => {
   // minimal valid 1-page PDF with just text "Hello"
   const minimalPdf = `%PDF-1.4
