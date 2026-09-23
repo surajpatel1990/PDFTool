@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Unlock PDF - Remove Password</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BSG00T9GEC"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag("js", new Date());
+  gtag("config", "G-BSG00T9GEC");
+</script>
+</head>
+<body>
+<header><h1>Unlock PDF</h1><p>Remove password protection</p></header>
+<div class="tool-page">
+  <div class="dropzone" id="drop">Drop a password-protected PDF here or click to select</div>
+  <input type="file" id="fileInput" accept="application/pdf" hidden>
+  <div id="fileName"></div>
+  <p>PDF Password:</p>
+  <input type="password" id="pwd" placeholder="Enter password" style="padding:.6rem;width:100%;max-width:300px;">
+  <br><br>
+  <button id="unlockBtn" disabled>Unlock & Download</button>
+  <div id="status" style="margin-top:1rem;"></div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const fileName = document.getElementById('fileName');
+const pwdInput = document.getElementById('pwd');
+const unlockBtn = document.getElementById('unlockBtn');
+const status = document.getElementById('status');
+let currentFile = null;
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+drop.ondragleave = () => drop.classList.remove('dragover');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); };
+fileInput.onchange = () => handleFile(fileInput.files[0]);
+
+function handleFile(file) {
+  if (!file) return;
+  currentFile = file;
+  fileName.textContent = file.name;
+  unlockBtn.disabled = false;
+}
+
+unlockBtn.onclick = async () => {
+  const password = pwdInput.value;
+  if (!password) { alert('Please enter the PDF password'); return; }
+
+  unlockBtn.disabled = true;
+  status.textContent = 'Unlocking... (this may take a moment for large PDFs)';
+
+  try {
+    const bytes = await currentFile.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: bytes, password: password });
+    const pdf = await loadingTask.promise;
+
+    const { jsPDF } = window.jspdf;
+    let outDoc = null;
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      status.textContent = `Processing page ${i} of ${pdf.numPages}...`;
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+      const orientation = viewport.width > viewport.height ? 'l' : 'p';
+      if (!outDoc) {
+        outDoc = new jsPDF({ orientation, unit: 'pt', format: [viewport.width, viewport.height] });
+      } else {
+        outDoc.addPage([viewport.width, viewport.height], orientation);
+      }
+      outDoc.addImage(imgData, 'JPEG', 0, 0, viewport.width, viewport.height);
+    }
+
+    outDoc.save('unlocked.pdf');
+    status.textContent = `Done! Unlocked PDF downloaded (${pdf.numPages} pages).`;
+  } catch (err) {
+    console.error(err);
+    if (err.name === 'PasswordException') {
+      status.textContent = 'Incorrect password. Please try again.';
+    } else {
+      status.textContent = 'Failed to unlock PDF. Make sure the file is valid.';
+    }
+  }
+  unlockBtn.disabled = false;
+};
+</script>
+</body>
+</html>
